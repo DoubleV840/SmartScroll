@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+  <title>SmartScroll</title>
+  <meta name="description" content="Un fil de vidéos courtes uniquement sur les sujets que tu choisis.">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="SmartScroll">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="app">
+    <!-- Lecteur YouTube unique, sous le fil : les diapos sont transparentes
+         quand leur vidéo joue, et c'est le fil qui capte tous les gestes. -->
+    <div id="stage"><div id="player"></div></div>
+
+    <main id="feed" aria-label="Fil de vidéos"></main>
+
+    <header id="topbar">
+      <nav id="chips" aria-label="Sujets"></nav>
+      <button class="icon-btn" id="btn-settings" aria-label="Réglages">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h9M18 6h3M3 12h3M12 12h9M3 18h11M20 18h1"/><circle cx="15" cy="6" r="2.2"/><circle cx="9" cy="12" r="2.2"/><circle cx="17" cy="18" r="2.2"/></svg>
+      </button>
+    </header>
+
+    <button id="sound-pill" hidden>
+      <svg viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9zm12.5 3 2.5-2.5-1-1-2.5 2.5L13 8.5l-1 1 2.5 2.5-2.5 2.5 1 1 2.5-2.5 2.5 2.5 1-1z"/></svg>
+      <span>Toucher pour le son</span>
+    </button>
+    <div id="tap-hint" hidden>Touche la vidéo une fois pour activer le son</div>
+
+    <div id="toast" role="status" aria-live="polite"></div>
+
+    <!-- Écran d'accueil / états vides -->
+    <section id="empty" hidden></section>
+
+    <!-- Réglages -->
+    <section id="settings" hidden aria-label="Réglages">
+      <div class="sheet">
+        <div class="sheet-head">
+          <h1>Réglages</h1>
+          <button class="text-btn" id="btn-close-settings">Terminé</button>
+        </div>
+
+        <div class="group">
+          <h2>Mes sujets</h2>
+          <p class="hint">Le fil ne montre que des vidéos sur ces sujets. Sois précis : « recettes vegan rapides » marche mieux que « cuisine ».</p>
+          <ul id="topic-list" class="rows"></ul>
+          <form id="topic-form" class="add-row">
+            <input id="topic-input" type="text" placeholder="Ajouter un sujet…" autocomplete="off" enterkeyhint="done">
+            <button type="submit" class="add-btn" aria-label="Ajouter">+</button>
+          </form>
+        </div>
+
+        <div class="group">
+          <h2>Mots à exclure</h2>
+          <p class="hint">Les vidéos dont le titre, la description ou les tags contiennent ces mots sont écartées.</p>
+          <div id="exclude-list" class="tags"></div>
+          <form id="exclude-form" class="add-row">
+            <input id="exclude-input" type="text" placeholder="Ajouter un mot…" autocomplete="off" enterkeyhint="done">
+            <button type="submit" class="add-btn" aria-label="Ajouter">+</button>
+          </form>
+        </div>
+
+        <div class="group">
+          <h2>Filtres</h2>
+          <div class="field">
+            <span>Format</span>
+            <div class="seg" data-setting="format">
+              <button data-value="shorts">Shorts verticaux</button>
+              <button data-value="all">Toutes</button>
+            </div>
+          </div>
+          <div class="field">
+            <span>Langue</span>
+            <div class="seg" data-setting="lang">
+              <button data-value="fr">Français</button>
+              <button data-value="en">Anglais</button>
+              <button data-value="">Toutes</button>
+            </div>
+          </div>
+          <div class="field">
+            <span>Ancienneté</span>
+            <div class="seg" data-setting="period">
+              <button data-value="month">&lt; 1 mois</button>
+              <button data-value="year">&lt; 1 an</button>
+              <button data-value="">Toutes</button>
+            </div>
+          </div>
+          <div class="field">
+            <span>Tri</span>
+            <div class="seg" data-setting="order">
+              <button data-value="relevance">Pertinence</button>
+              <button data-value="date">Récentes</button>
+              <button data-value="viewCount">Populaires</button>
+            </div>
+          </div>
+          <div class="field">
+            <span>Fin de vidéo</span>
+            <div class="seg" data-setting="autoNext">
+              <button data-value="false">Rejouer</button>
+              <button data-value="true">Suivante</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="group" id="blocked-group">
+          <h2>Chaînes masquées</h2>
+          <ul id="blocked-list" class="rows"></ul>
+        </div>
+
+        <div class="group">
+          <h2>Clé API YouTube</h2>
+          <p class="hint">Gratuite, elle permet de chercher les vidéos. <button class="link-btn" data-action="key-guide">Comment l'obtenir ?</button></p>
+          <form id="key-form" class="add-row">
+            <input id="key-input" type="password" placeholder="AIza…" autocomplete="off" spellcheck="false">
+            <button type="submit" class="add-btn" aria-label="Enregistrer">✓</button>
+          </form>
+          <p class="hint" id="quota-line"></p>
+        </div>
+
+        <div class="group">
+          <h2>Autres appareils</h2>
+          <p class="hint">Copie ce lien et ouvre-le sur ton téléphone : il importe ta clé et tes réglages. Ne le partage pas, il contient ta clé.</p>
+          <button class="wide-btn" data-action="copy-setup">Copier le lien de configuration</button>
+        </div>
+
+        <div class="group">
+          <h2>Historique</h2>
+          <p class="hint" id="seen-line"></p>
+          <button class="wide-btn" data-action="reset-seen">Revoir les vidéos déjà vues</button>
+        </div>
+
+        <p class="footer">SmartScroll · vidéos lues avec le lecteur officiel YouTube</p>
+      </div>
+    </section>
+  </div>
+
+  <template id="slide-tpl">
+    <article class="slide">
+      <img class="thumb" alt="" decoding="async">
+      <div class="shade"></div>
+      <div class="center-icon"></div>
+      <div class="meta">
+        <div class="topic"></div>
+        <div class="channel"></div>
+        <div class="title"></div>
+        <div class="sub"></div>
+      </div>
+      <div class="rail">
+        <button class="rail-btn" data-action="fav" aria-label="Favori">
+          <svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.6-9.6-9.3C.9 8.3 3 4.5 6.7 4.5c2.1 0 3.5 1.1 5.3 3.1 1.8-2 3.2-3.1 5.3-3.1 3.7 0 5.8 3.8 4.3 7.2C19.5 16.4 12 21 12 21z"/></svg>
+          <span>Favori</span>
+        </button>
+        <button class="rail-btn" data-action="sound" aria-label="Son">
+          <svg class="ico-muted" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9zm12.5 3 2.5-2.5-1-1-2.5 2.5L13 8.5l-1 1 2.5 2.5-2.5 2.5 1 1 2.5-2.5 2.5 2.5 1-1z"/></svg>
+          <svg class="ico-sound" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9zm11.5 3a4.5 4.5 0 0 0-2.5-4v8a4.5 4.5 0 0 0 2.5-4zM13 3.2v2.1a7 7 0 0 1 0 13.4v2.1a9 9 0 0 0 0-17.6z"/></svg>
+          <span>Son</span>
+        </button>
+        <button class="rail-btn" data-action="open" aria-label="Ouvrir dans YouTube">
+          <svg viewBox="0 0 24 24"><path d="M14 3h7v7h-2V6.4l-9.3 9.3-1.4-1.4L17.6 5H14zM5 5h6v2H5v12h12v-6h2v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2z"/></svg>
+          <span>YouTube</span>
+        </button>
+        <button class="rail-btn" data-action="block" aria-label="Masquer cette chaîne">
+          <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 0 1 6.3 12.9L7.1 5.7A8 8 0 0 1 12 4zM4 12a8 8 0 0 1 1.7-4.9l11.2 11.2A8 8 0 0 1 4 12z"/></svg>
+          <span>Masquer</span>
+        </button>
+      </div>
+      <div class="progress"><div class="bar"></div></div>
+    </article>
+  </template>
+
+  <script src="app.js"></script>
+</body>
+</html>
