@@ -165,7 +165,13 @@ class ApiError extends Error {
   }
 }
 
+const QUOTA_MESSAGE = 'Le quota YouTube du jour est épuisé. Il repart à zéro à 9 h ; les vidéos déjà chargées restent visibles.';
+
 async function api(path, params, cost, key = settings.apiKey) {
+  // Quota déjà épuisé aujourd'hui : inutile d'interroger YouTube, la
+  // réponse serait un refus. Le compteur repart seul au changement de jour.
+  if (usedQuota() >= 10000) throw new ApiError('quota', QUOTA_MESSAGE);
+
   const url = new URL(API + path);
   for (const [k, v] of Object.entries(params)) {
     if (v !== '' && v != null) url.searchParams.set(k, v);
@@ -188,7 +194,7 @@ async function api(path, params, cost, key = settings.apiKey) {
   if (/quotaExceeded|dailyLimitExceeded/.test(all)) {
     quota = { day: quotaDay(), used: 10000 };
     save('quota', quota);
-    throw new ApiError('quota', 'Le quota YouTube du jour est épuisé. Il repart à zéro vers 9 h.');
+    throw new ApiError('quota', QUOTA_MESSAGE);
   }
   if (/REFERRER|referer/i.test(all)) {
     throw new ApiError('key', "Ta clé API n'autorise pas cette adresse. Vérifie la restriction « Sites web » de la clé.");
@@ -580,11 +586,17 @@ async function ensureMore() {
   }
 }
 
+let quotaToastDay = '';
+
 function handleApiError(e) {
   if (e.kind === 'key') {
     showEmpty('welcome', e.message);
   } else if (!items.length) {
     showEmpty(e.kind === 'quota' ? 'quota' : 'offline', e.message);
+  } else if (e.kind === 'quota') {
+    // Une seule alerte par jour, pas une à chaque vidéo.
+    if (quotaToastDay !== quotaDay()) toast(e.message);
+    quotaToastDay = quotaDay();
   } else {
     toast(e.message);
   }
@@ -1083,7 +1095,7 @@ function showEmpty(kind, message = '') {
   const screens = {
     none: ['Rien trouvé', "Aucune vidéo ne correspond à tes sujets et filtres. Essaie des sujets plus larges, une autre langue ou l'ancienneté « Toutes »."],
     fav: ['Pas encore de favoris', 'Touche le cœur ou tape deux fois sur une vidéo pour la garder ici.'],
-    quota: ['Quota du jour épuisé', 'YouTube limite le nombre de recherches par jour. Le compteur repart à zéro vers 9 h. Tes favoris restent disponibles.'],
+    quota: ['Quota du jour épuisé', "YouTube limite le nombre de recherches par jour. Le compteur repart à zéro tout seul à 9 h : reviens après et le fil se remplira. En attendant, tes favoris restent disponibles."],
     offline: ['Pas de vidéos pour le moment', ''],
   };
   const [title, text] = screens[kind];
