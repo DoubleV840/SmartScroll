@@ -972,14 +972,15 @@ function showEmpty(kind, message = '') {
         ${KEY_STEPS}
         ${err}
         <form class="add-row" id="welcome-key">
-          <input type="password" placeholder="Colle ta clé ici (AIza…)" autocomplete="off" spellcheck="false" value="${escapeHtml(settings.apiKey)}">
+          <input type="password" placeholder="Clé (AIza…) ou lien de configuration" autocomplete="off" spellcheck="false" value="${escapeHtml(settings.apiKey)}">
           <button type="submit" class="add-btn" aria-label="Valider">✓</button>
         </form>
-        <p class="hint" style="margin-top:14px">Déjà configuré sur un autre appareil ? Dans ses réglages, touche « Copier le lien de configuration » et ouvre ce lien ici.</p>
+        <p class="hint" style="margin-top:14px">Déjà configuré sur un autre appareil ? Dans ses réglages, touche « Copier le lien de configuration », puis colle ce lien dans le champ ci-dessus.</p>
       </div>`;
     $('#welcome-key', emptyEl).onsubmit = async (e) => {
       e.preventDefault();
       const input = $('input', e.target);
+      if (importSetup(input.value)) return restart();
       const btn = $('button', e.target);
       btn.disabled = true;
       const ok = await saveKey(input.value);
@@ -1231,7 +1232,8 @@ $('#exclude-form').onsubmit = (e) => {
 
 $('#key-form').onsubmit = async (e) => {
   e.preventDefault();
-  await saveKey($('#key-input').value);
+  const value = $('#key-input').value;
+  if (!importSetup(value)) await saveKey(value);
   renderSettings();
 };
 
@@ -1297,10 +1299,13 @@ async function shareSetup() {
   }
 }
 
-function importSetupFromHash() {
-  const m = /^#setup=([\w-]+)$/.exec(location.hash);
-  if (!m) return;
-  history.replaceState(null, '', location.pathname + location.search);
+// Importe un lien de configuration, ouvert ou collé dans le champ de la clé.
+// Le collage sert sur iPhone : l'appli installée sur l'écran d'accueil ne
+// partage pas ses données avec Safari, où s'ouvrent les liens.
+// Renvoie false si le texte n'est pas un lien de configuration.
+function importSetup(text) {
+  const m = /#setup=([\w-]+)/.exec(text);
+  if (!m) return false;
   try {
     const data = decodeSetup(m[1]);
     for (const k of Object.keys(DEFAULTS)) if (k in data) settings[k] = data[k];
@@ -1309,6 +1314,14 @@ function importSetupFromHash() {
   } catch {
     toast('Ce lien de configuration est abîmé.');
   }
+  return true;
+}
+
+function importSetupFromHash() {
+  const hash = location.hash;
+  if (!hash.startsWith('#setup=')) return;
+  history.replaceState(null, '', location.pathname + location.search);
+  importSetup(hash);
 }
 
 // ---------- Démarrage ----------
