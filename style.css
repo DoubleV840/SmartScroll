@@ -689,6 +689,14 @@ body:not(.muted) .ico-muted { display: none; }
 
 .rows li.off .name { color: var(--muted); text-decoration: line-through; }
 
+.rows .warn {
+  display: block;
+  margin-top: 2px;
+  color: #ffb340;
+  font-size: 12px;
+  white-space: normal;
+}
+
 .del-btn {
   flex: none;
   width: 34px;

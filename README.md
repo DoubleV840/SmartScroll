@@ -8,6 +8,10 @@ lecteur officiel). Web app installable (PWA) : iPhone, Android et ordinateur.
 
 - Sujets libres (« recettes rapides », « impression 3D »…), activables un par un,
   et puces en haut du fil pour n'en regarder qu'un.
+- Filtre de pertinence : une vidéo n'entre dans le fil que si son titre, sa
+  description ou ses tags contiennent au moins la moitié des mots du sujet
+  (racines de 4 lettres, sans accents ni pluriel). Un sujet qui ne donne rien
+  est signalé (faute de frappe probable).
 - Mots à exclure (titre, description, tags), chaînes masquées.
 - Filtres : Shorts verticaux ou toutes les vidéos, langue, ancienneté, tri.
 - Favoris (cœur ou double tap), vidéos déjà vues jamais reproposées.

@@ -93,6 +93,29 @@ function excludedBy(text) {
   });
 }
 
+// Mots vides ignorés quand on vérifie qu'une vidéo parle bien du sujet.
+const STOP_WORDS = new Set((
+  'a au aux avec ce ces chez dans de des du en entre et la le les leur leurs ma mes mon ou par pour sa ses son sur ta tes ton un une vos votre ' +
+  'the of and for to in on with my your how what best'
+).split(' '));
+
+// Racines des mots-clés d'un sujet : sans accents, sans pluriel, coupées à
+// 4 lettres pour accepter les variantes (« apéritif » ≈ « apéro »,
+// « impression » ≈ « imprimante », « jeux » ≈ « jeu »).
+function topicStems(q) {
+  const words = normalize(q).split(/[^a-z0-9]+/).filter((w) => w && !STOP_WORDS.has(w));
+  return [...new Set(words.map((w) => (w.length > 3 ? w.replace(/[sx]$/, '') : w).slice(0, 4)))];
+}
+
+// Vrai si le texte contient au moins la moitié des mots-clés du sujet.
+function onTopic(text, q) {
+  const stems = topicStems(q);
+  if (!stems.length) return true;
+  const tokens = normalize(text).split(/[^a-z0-9]+/).filter(Boolean);
+  const hits = stems.filter((stem) => tokens.some((t) => t.startsWith(stem))).length;
+  return hits >= Math.ceil(stems.length / 2);
+}
+
 function parseDuration(iso) {
   const m = /^P(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?$/.exec(iso || '');
   if (!m) return 0;
@@ -181,9 +204,9 @@ async function api(path, params, cost, key = settings.apiKey) {
 }
 
 function searchParams(topic, pageToken) {
+  // Pas de « #shorts » ajouté : il faisait remonter des Shorts populaires
+  // hors sujet. Le format vertical est vérifié ensuite via videos.list.
   let q = topic.q;
-  // Le mot-clé #shorts aide la recherche à remonter des vidéos verticales.
-  if (settings.format === 'shorts') q += ' #shorts';
   for (const w of settings.exclude) q += w.includes(' ') ? ` -"${w}"` : ` -${w}`;
 
   const params = {
@@ -211,7 +234,7 @@ function searchParams(topic, pageToken) {
 
 // Transforme une réponse videos.list en vidéo du fil, ou null si elle ne
 // passe pas les filtres.
-function toVideo(item, topicId) {
+function toVideo(item, topic) {
   const sn = item.snippet || {};
   if (item.status?.embeddable === false) return null;
   if (sn.liveBroadcastContent && sn.liveBroadcastContent !== 'none') return null;
@@ -232,7 +255,7 @@ function toVideo(item, topicId) {
 
   const title = sn.localized?.title || sn.title || '';
   const text = [title, sn.title, sn.description, (sn.tags || []).join(' '), sn.channelTitle].join(' ');
-  if (excludedBy(text)) return null;
+  if (excludedBy(text) || !onTopic(text, topic.q)) return null;
 
   return {
     id: item.id,
@@ -243,15 +266,16 @@ function toVideo(item, topicId) {
     duration,
     views: +(item.statistics?.viewCount || 0),
     vertical,
-    topic: topicId,
+    topic: topic.id,
   };
 }
 
 // ---------- Réserves de vidéos par sujet ----------
 
 // Toute modification d'un filtre de recherche invalide les réserves.
+const SEARCH_VERSION = 2; // à incrémenter quand la logique de recherche change
 const searchSig = () =>
-  JSON.stringify([settings.format, settings.lang, settings.period, settings.order, settings.exclude]);
+  JSON.stringify([SEARCH_VERSION, settings.format, settings.lang, settings.period, settings.order, settings.exclude]);
 
 function poolFor(topic) {
   let p = pools[topic.id];
@@ -299,14 +323,33 @@ async function fetchTopic(topic) {
     const rank = new Map(ids.map((id, i) => [id, i]));
     const videos = (details.items || [])
       .sort((a, b) => rank.get(a.id) - rank.get(b.id))
-      .map((it) => toVideo(it, topic.id))
+      .map((it) => toVideo(it, topic))
       .filter(Boolean);
     // Un léger mélange par paquets de 5 garde l'ordre de pertinence global.
     for (let i = 0; i < videos.length; i += 5) p.items.push(...shuffle(videos.slice(i, i + 5)));
     added = videos.length;
   }
+
+  // Sujet qui ne donne rien dès la première page : faute de frappe probable,
+  // ou filtres trop serrés. On le signale une fois, et dans les réglages.
+  if (restart) {
+    const nothingFound = !(data.items || []).length;
+    p.warning = nothingFound ? 'spelling' : ids.length && !added ? 'filters' : '';
+    if (p.warning && !warnedTopics.has(topic.id)) {
+      warnedTopics.add(topic.id);
+      toast(topicWarning(topic, p.warning));
+    }
+  }
   savePools();
   return added;
+}
+
+const warnedTopics = new Set();
+
+function topicWarning(topic, kind) {
+  return kind === 'spelling'
+    ? `YouTube ne trouve rien pour « ${topic.q} ». Vérifie l'orthographe.`
+    : `Aucune vidéo trouvée ne parle vraiment de « ${topic.q} ». Vérifie l'orthographe ou essaie des mots plus courants.`;
 }
 
 let drawTurn = 0;
@@ -1149,6 +1192,13 @@ function renderSettings() {
       <span class="name"></span>
       <button class="del-btn" aria-label="Supprimer">×</button>`;
     $('.name', li).textContent = t.q;
+    const pool = pools[t.id];
+    if (pool?.warning && pool.sig === searchSig() && pool.q === t.q) {
+      const warn = document.createElement('small');
+      warn.className = 'warn';
+      warn.textContent = pool.warning === 'spelling' ? 'Aucun résultat : vérifie l\'orthographe' : 'Aucune vidéo vraiment sur ce sujet';
+      $('.name', li).append(warn);
+    }
     $('input', li).onchange = (e) => {
       t.on = e.target.checked;
       li.className = t.on ? '' : 'off';
