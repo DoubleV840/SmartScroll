@@ -31,7 +31,7 @@ puis ouvrir `http://<ip-du-mac>:8765` sur le téléphone.
 2. https://console.cloud.google.com/apis/library/youtube.googleapis.com : Activer.
 3. https://console.cloud.google.com/apis/credentials : Créer des identifiants → Clé API.
 4. Conseillé : restreindre la clé à « YouTube Data API v3 » et, une fois l'appli
-   en ligne, à son adresse (restriction « Sites web », ex. `https://doublev840.github.io/*`).
+   en ligne, à son adresse (restriction « Sites web » : `https://smartscroll.ivwi.fr/*`).
 
 Quota gratuit : 10 000 unités par jour. Une recherche coûte 101 unités et
 ramène jusqu'à 50 vidéos, soit ~99 recherches par jour. Remise à zéro à minuit
@@ -42,8 +42,14 @@ La clé n'est jamais dans le dépôt : elle est stockée dans le navigateur
 
 ## Mise en ligne (GitHub Pages)
 
-Site statique sans build : pousser sur `main`, puis dans le dépôt GitHub
-Settings → Pages → Source « Deploy from a branch » → `main` / `(root)`.
+En ligne sur **https://smartscroll.ivwi.fr** (dépôt `DoubleV840/SmartScroll`).
+Site statique sans build : un `git push` sur `main` suffit à publier.
+
+- GitHub : Settings → Pages → « Deploy from a branch » → `main` / `(root)`.
+  Le fichier `CNAME` donne le domaine ; `doublev840.github.io/SmartScroll`
+  redirige vers lui.
+- DNS (zone `ivwi.fr` chez OVH) : `smartscroll  CNAME  doublev840.github.io.`
+- La clé API doit autoriser `https://smartscroll.ivwi.fr/*`.
 
 Après une modification de `index.html`, `style.css` ou `app.js`, le service
 worker sert la nouvelle version dès que le réseau répond (réseau d'abord).

@@ -1276,8 +1276,14 @@ function decodeSetup(s) {
   return JSON.parse(new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0))));
 }
 
+// Adresse publique de l'appli : un lien créé depuis le Mac en local doit
+// quand même ouvrir la version en ligne sur le téléphone.
+const PUBLIC_URL = 'https://smartscroll.ivwi.fr/';
+
 async function shareSetup() {
-  const url = `${location.origin}${location.pathname}#setup=${encodeSetup()}`;
+  const local = /^(localhost|127\.|10\.|192\.168\.)/.test(location.hostname);
+  const base = local ? PUBLIC_URL : `${location.origin}${location.pathname}`;
+  const url = `${base}#setup=${encodeSetup()}`;
   try {
     if (navigator.share && matchMedia('(pointer: coarse)').matches) {
       await navigator.share({ title: 'SmartScroll', url });
